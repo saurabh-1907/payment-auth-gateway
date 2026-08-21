@@ -1,0 +1,21 @@
+package com.saurabh.paymentgateway.api;
+
+import com.saurabh.paymentgateway.service.AuthorizationService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import java.util.UUID;
+
+@RestController @RequestMapping("/v1/authorizations")
+public class AuthorizationController {
+ private final AuthorizationService service; private final com.saurabh.paymentgateway.service.RateLimiter limiter;
+ public AuthorizationController(AuthorizationService service,com.saurabh.paymentgateway.service.RateLimiter limiter){this.service=service;this.limiter=limiter;}
+ @PostMapping @PreAuthorize("hasRole('PAYMENT_CLIENT')") public AuthorizationResponse authorize(@RequestHeader("Idempotency-Key") @Pattern(regexp="[A-Za-z0-9._:-]{8,128}") String key,@Valid @RequestBody CreateAuthorizationRequest request,Authentication auth){check(auth);return service.authorize(auth.getName(),key,request);}
+ @PostMapping("/{id}/capture") @PreAuthorize("hasRole('PAYMENT_CLIENT')") public AuthorizationResponse capture(@PathVariable UUID id,Authentication auth){check(auth);return service.capture(id);}
+ @PostMapping("/{id}/void") @PreAuthorize("hasRole('PAYMENT_CLIENT')") public AuthorizationResponse voidAuthorization(@PathVariable UUID id,Authentication auth){check(auth);return service.voidAuthorization(id);}
+ @GetMapping("/{id}") @PreAuthorize("hasRole('PAYMENT_CLIENT')") public AuthorizationResponse get(@PathVariable UUID id,Authentication auth){check(auth);return service.get(id);}
+ private void check(Authentication a){if(!limiter.allow(a.getName()))throw new RateLimitExceededException();}
+ public static class RateLimitExceededException extends RuntimeException{}
+}
